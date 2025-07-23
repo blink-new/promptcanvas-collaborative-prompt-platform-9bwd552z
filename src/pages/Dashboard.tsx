@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Plus, Clock, Users, FileText } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Plus, Clock, Users, FileText, Edit, Play } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -7,6 +8,7 @@ import { blink } from '@/blink/client'
 import type { Workspace, Prompt, User } from '@/types'
 
 export function Dashboard() {
+  const navigate = useNavigate()
   const [user, setUser] = useState<User | null>(null)
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [recentPrompts, setRecentPrompts] = useState<Prompt[]>([])
@@ -202,7 +204,7 @@ export function Dashboard() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {recentPrompts.map((prompt) => (
-              <Card key={prompt.id} className="hover:shadow-md transition-shadow cursor-pointer">
+              <Card key={prompt.id} className="hover:shadow-md transition-shadow">
                 <CardHeader>
                   <CardTitle className="text-lg">{prompt.title}</CardTitle>
                   <CardDescription className="line-clamp-2">
@@ -210,9 +212,9 @@ export function Dashboard() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center space-x-2">
-                      <Badge variant="outline">v{prompt.version}</Badge>
+                      <Badge variant="outline">Latest</Badge>
                       {prompt.tags && JSON.parse(prompt.tags).map((tag: string) => (
                         <Badge key={tag} variant="secondary" className="text-xs">
                           {tag}
@@ -222,6 +224,25 @@ export function Dashboard() {
                     <span className="text-xs text-muted-foreground">
                       {new Date(prompt.updated_at).toLocaleDateString()}
                     </span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button 
+                      size="sm" 
+                      onClick={() => navigate(`/editor/${prompt.id}`)}
+                      className="flex-1"
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => navigate(`/playground?promptId=${prompt.id}`)}
+                      className="flex-1"
+                    >
+                      <Play className="h-4 w-4 mr-2" />
+                      Test
+                    </Button>
                   </div>
                 </CardContent>
               </Card>

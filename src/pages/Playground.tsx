@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Play, Copy, Download, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -7,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { blink } from '@/blink/client'
-import type { User, LLMModel } from '@/types'
+import type { User, LLMModel, Prompt } from '@/types'
 
 const models: { value: LLMModel; label: string; description: string }[] = [
   { value: 'gpt-4o-mini', label: 'GPT-4o Mini', description: 'Fast and efficient for most tasks' },
@@ -17,6 +18,7 @@ const models: { value: LLMModel; label: string; description: string }[] = [
 ]
 
 export function Playground() {
+  const [searchParams] = useSearchParams()
   const [user, setUser] = useState<User | null>(null)
   const [prompt, setPrompt] = useState('')
   const [selectedModel, setSelectedModel] = useState<LLMModel>('gpt-4o-mini')
@@ -30,12 +32,36 @@ export function Playground() {
     timestamp: string
   }>>([])
 
+  const loadPromptFromId = async (promptId: string) => {
+    try {
+      const promptData = await blink.db.prompts.list({
+        where: { id: promptId },
+        limit: 1
+      })
+      
+      if (promptData.length > 0) {
+        const promptItem = promptData[0]
+        setPrompt(promptItem.content || '')
+      }
+    } catch (error) {
+      console.error('Failed to load prompt:', error)
+    }
+  }
+
   useEffect(() => {
     const unsubscribe = blink.auth.onAuthStateChanged((state) => {
       setUser(state.user)
     })
     return unsubscribe
   }, [])
+
+  // Load prompt from URL parameter if provided
+  useEffect(() => {
+    const promptId = searchParams.get('promptId')
+    if (promptId && user) {
+      loadPromptFromId(promptId)
+    }
+  }, [searchParams, user])
 
   const runTest = async () => {
     if (!prompt.trim() || !user) return
