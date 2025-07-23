@@ -10,8 +10,39 @@ export interface Workspace {
   name: string
   description?: string
   user_id: string
+  owner_id: string
   created_at: string
   updated_at: string
+}
+
+export interface WorkspaceMember {
+  id: string
+  workspace_id: string
+  user_id: string
+  role: 'owner' | 'editor' | 'viewer'
+  invited_by?: string
+  invited_at: string
+  joined_at: string
+  created_at: string
+  updated_at: string
+}
+
+export interface WorkspaceInvitation {
+  id: string
+  workspace_id: string
+  email: string
+  role: 'editor' | 'viewer'
+  invited_by: string
+  token: string
+  expires_at: string
+  accepted_at?: string
+  created_at: string
+}
+
+export interface WorkspaceWithMembers extends Workspace {
+  members?: WorkspaceMember[]
+  member_count?: number
+  user_role?: 'owner' | 'editor' | 'viewer'
 }
 
 export interface Prompt {

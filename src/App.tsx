@@ -5,6 +5,7 @@ import { Workspaces } from '@/pages/Workspaces'
 import { Playground } from '@/pages/Playground'
 import { PromptEditor } from '@/pages/PromptEditor'
 import { Library } from '@/pages/Library'
+import { WorkspaceDetail } from '@/pages/WorkspaceDetail'
 import { Toaster } from '@/components/ui/toaster'
 
 function App() {
@@ -14,6 +15,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/workspaces" element={<Workspaces />} />
+          <Route path="/workspace/:id" element={<WorkspaceDetail />} />
           <Route path="/library" element={<Library />} />
           <Route path="/playground" element={<Playground />} />
           <Route path="/editor/:promptId" element={<PromptEditor />} />

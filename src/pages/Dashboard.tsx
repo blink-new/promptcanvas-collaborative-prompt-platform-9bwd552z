@@ -1,36 +1,38 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Clock, Users, FileText, Edit, Play } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { blink } from '@/blink/client'
-import type { Workspace, Prompt, User } from '@/types'
+import { Plus, Clock, Users, FileText, Edit, Play, Crown } from 'lucide-react'
+import { Button } from '../components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
+import { Badge } from '../components/ui/badge'
+import { blink } from '../blink/client'
+import type { Prompt, User, WorkspaceWithMembers } from '../types'
+import { getUserWorkspaces, addWorkspaceMember } from '../utils/workspace-access'
 
 export function Dashboard() {
   const navigate = useNavigate()
   const [user, setUser] = useState<User | null>(null)
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([])
+  const [workspaces, setWorkspaces] = useState<WorkspaceWithMembers[]>([])
   const [recentPrompts, setRecentPrompts] = useState<Prompt[]>([])
   const [loading, setLoading] = useState(true)
 
   const loadData = async (userId: string) => {
     try {
-      // Load workspaces
-      const workspacesData = await blink.db.workspaces.list({
-        where: { user_id: userId },
-        orderBy: { updated_at: 'desc' },
-        limit: 6
-      })
-      setWorkspaces(workspacesData)
+      // Load workspaces that user has access to
+      const workspacesData = await getUserWorkspaces(userId)
+      setWorkspaces(workspacesData.slice(0, 6)) // Limit to 6 for dashboard
 
-      // Load recent prompts
-      const promptsData = await blink.db.prompts.list({
-        where: { user_id: userId },
-        orderBy: { updated_at: 'desc' },
-        limit: 8
-      })
-      setRecentPrompts(promptsData)
+      // Load recent prompts from accessible workspaces
+      if (workspacesData.length > 0) {
+        const workspaceIds = workspacesData.map(w => w.id)
+        const promptsData = await blink.db.prompts.list({
+          where: { 
+            workspaceId: { in: workspaceIds }
+          },
+          orderBy: { updatedAt: 'desc' },
+          limit: 8
+        })
+        setRecentPrompts(promptsData)
+      }
     } catch (error) {
       console.error('Failed to load dashboard data:', error)
     } finally {
@@ -56,9 +58,15 @@ export function Dashboard() {
         id: `ws_${Date.now()}`,
         name: 'New Workspace',
         description: 'A new workspace for collaborative prompt engineering',
-        user_id: user.id
+        userId: user.id,
+        ownerId: user.id
       })
-      setWorkspaces(prev => [newWorkspace, ...prev])
+
+      // Add the creator as owner
+      await addWorkspaceMember(newWorkspace.id, user.id, 'owner')
+      
+      // Reload data to show the new workspace
+      loadData(user.id)
     } catch (error) {
       console.error('Failed to create workspace:', error)
     }
@@ -77,7 +85,6 @@ export function Dashboard() {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Welcome Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">
@@ -93,7 +100,6 @@ export function Dashboard() {
         </Button>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -137,11 +143,10 @@ export function Dashboard() {
         </Card>
       </div>
 
-      {/* Workspaces Grid */}
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold">Your Workspaces</h2>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={() => navigate('/workspaces')}>
             View All
           </Button>
         </div>
@@ -163,16 +168,33 @@ export function Dashboard() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {workspaces.map((workspace) => (
-              <Card key={workspace.id} className="hover:shadow-md transition-shadow cursor-pointer">
+              <Card 
+                key={workspace.id} 
+                className="hover:shadow-md transition-shadow cursor-pointer"
+                onClick={() => navigate(`/workspace/${workspace.id}`)}
+              >
                 <CardHeader>
-                  <CardTitle className="text-lg">{workspace.name}</CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg">{workspace.name}</CardTitle>
+                    {workspace.user_role === 'owner' && (
+                      <Crown className="h-4 w-4 text-amber-500" />
+                    )}
+                  </div>
                   <CardDescription>{workspace.description}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center justify-between">
-                    <Badge variant="secondary">Active</Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">Active</Badge>
+                      <Badge 
+                        variant={workspace.user_role === 'owner' ? 'default' : 'outline'}
+                        className="text-xs"
+                      >
+                        {workspace.user_role}
+                      </Badge>
+                    </div>
                     <span className="text-xs text-muted-foreground">
-                      {new Date(workspace.updated_at).toLocaleDateString()}
+                      {new Date(workspace.updatedAt).toLocaleDateString()}
                     </span>
                   </div>
                 </CardContent>
@@ -182,11 +204,10 @@ export function Dashboard() {
         )}
       </div>
 
-      {/* Recent Prompts */}
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold">Recent Prompts</h2>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={() => navigate('/library')}>
             View All
           </Button>
         </div>
@@ -222,7 +243,7 @@ export function Dashboard() {
                       ))}
                     </div>
                     <span className="text-xs text-muted-foreground">
-                      {new Date(prompt.updated_at).toLocaleDateString()}
+                      {new Date(prompt.updatedAt).toLocaleDateString()}
                     </span>
                   </div>
                   <div className="flex items-center space-x-2">
